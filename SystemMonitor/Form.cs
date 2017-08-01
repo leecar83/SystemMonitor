@@ -78,22 +78,26 @@ namespace SystemMonitor
 
         private void setNetworkType()
         {
+            RegistryKey localKey = null;
             try
             {
                 log("Setting all networks to Private");
-                RegistryKey localKey = 
-                         RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine,
-                         RegistryView.Registry64);
+                localKey = RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, RegistryView.Registry64);
                 localKey = Registry.LocalMachine.OpenSubKey(NETWORKREGKEYNAME);
                 foreach (String subKey in localKey.GetSubKeyNames())
                 {
                     //Registry.SetValue(localKey + @"\" + subKey, "Category", 1);
                     log(subKey + " Set to Private Network");
+              
                 }
             }
             catch (Exception ex)
             {
                 log(ex.Message);
+            }
+            finally
+            {
+                localKey.Dispose();
             }
         }
 
