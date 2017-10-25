@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -10,15 +11,18 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace SystemMonitor
 {
-    public partial class Form : System.Windows.Forms.Form
+    public partial class MainForm : System.Windows.Forms.Form
     {
         #region DLL Imports and Constants
         private const String NETWORKREGKEYNAME = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles";
-        private const String LOGDIRECTORY = @"C:\StoreSys\Applications\Logs\";
+        private const String LOGDIRECTORY = @"C:\StoreSys\Applications\Logs\SystemMonitor\";
+        BlockingCollection<String> logMessages = new BlockingCollection<String>();
+        private int iLongtimerInterval = 40000;
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private extern static int QueryDisplayConfig([In] uint flags, ref uint numPathArrayElements, IntPtr pathArray, ref uint numModeArrayElements, IntPtr modeArray, out IntPtr currentTopologyId);
@@ -39,12 +43,13 @@ namespace SystemMonitor
         private const uint QDC_DATABASE_CURRENT = 4;
         #endregion
 
-        public Form()
+        public MainForm()
         {
             InitializeComponent();
             this.WindowState = FormWindowState.Minimized;
             setupLogFolder();
-            log("Starting Up");
+            Task.Factory.StartNew(() => RunConsumer());
+            addToLog("Starting Up");
             backgroundWorker1.RunWorkerAsync();
             backgroundWorker2.RunWorkerAsync();
         }
@@ -66,6 +71,7 @@ namespace SystemMonitor
 
         private void timer1_Tick(object sender, EventArgs e)
         {
+            timer1.Interval = iLongtimerInterval;
             if (!backgroundWorker1.IsBusy)
             {
                 backgroundWorker1.RunWorkerAsync();
@@ -76,60 +82,71 @@ namespace SystemMonitor
             }
         }
 
+        /// <summary>
+        /// Sets network type to private for all network adapters
+        /// </summary>
         private void setNetworkType()
         {
             RegistryKey localKey = null;
             try
             {
-                log("Setting all networks to Private");
+                addToLog("Setting all networks to Private");
                 localKey = RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, RegistryView.Registry64);
                 localKey = Registry.LocalMachine.OpenSubKey(NETWORKREGKEYNAME);
                 foreach (String subKey in localKey.GetSubKeyNames())
                 {
                     //Registry.SetValue(localKey + @"\" + subKey, "Category", 1);
-                    log(subKey + " Set to Private Network");
-              
+                    addToLog(subKey + " Set to Private Network");
+
                 }
             }
             catch (Exception ex)
             {
-                log(ex.Message);
+                addToLog(ex.Message);
             }
             finally
             {
                 localKey.Dispose();
             }
         }
-
+        
+        /// <summary>
+        /// Sets display topology to clone for multiple display setups if set to extended
+        /// </summary>
         private void setDisplayTopology()
         {
             try
             {
-                log("Checking Display Topology");
+                addToLog("Checking Display Count");
                 int i = Screen.AllScreens.Count();
-                log(i.ToString() + " display(s) connected");
+                addToLog(i.ToString() + " display(s) connected");
                 if (i > 1)
                 {
                     Topology current = getCurrentTopology();
-                    log("Current display topology is " + current.ToString());
-                    if(current == Topology.Extend)
+                    addToLog("Current display topology is " + current.ToString());
+                    if (current == Topology.Extend)
                     {
-                        log("Attempting to switch to clone mode");
+                        addToLog("Attempting to switch to clone mode");
                         //Process proc = Process.Start("DisplaySwitch", "/clone");
                         //proc.WaitForExit();
-                        log("Waiting for 15sec DisplaySwitch to work");
-                        Thread.Sleep(15000);
+                        addToLog("Waiting for 10sec DisplaySwitch to work");
+                        Thread.Sleep(10000);
                         current = getCurrentTopology();
-                        log("Display topology set to " + current.ToString());
+                        addToLog("Display topology set to " + current.ToString());
                     }   
                 }
             }
             catch (Exception ex)
             {
-                log(ex.Message);
+                addToLog(ex.Message);
             }
         }
 
+        /// <summary>
+        /// Get current display Topology Enum
+        /// </summary>
+        /// <returns></returns>
+        /// https://issues.team-mediaportal.com/fisheye/rdiff/MediaPortal-1/mediaportal/Core/Player/Windows7Helper.cs?r1=fd31b5c625643850f4b48155150717d2f8c365a5&r2=c76c81e1b6877bd3f3cd6e8cc115e13b4d57ee18&u&N
         private Topology getCurrentTopology()
         {
             uint numPathArrayElements;
@@ -173,6 +190,9 @@ namespace SystemMonitor
             return topology;
         }
 
+        /// <summary>
+        /// Creates directory for log folder and deletes old log files
+        /// </summary>
         private void setupLogFolder()
         {
             try
@@ -181,6 +201,17 @@ namespace SystemMonitor
                 {
                     Directory.CreateDirectory(LOGDIRECTORY);
                 }
+                else
+                {
+                    String [] files = Directory.GetFiles(LOGDIRECTORY, "*.log");
+                    foreach (String file in files)
+                    {
+                        if(File.GetLastWriteTime(file) < DateTime.Now.AddYears(-1))
+                        {
+                            File.Delete(file);
+                        }
+                    }
+                }
             }
             catch(Exception ex)
             {
@@ -188,18 +219,14 @@ namespace SystemMonitor
             }
         }
 
-        private static void log(String LogEntry, String LogFile = @"C:\StoreSys\Applications\Logs\")
+        private void addToLog(String LogEntry)
         {
-            String strLogFileName = DateTime.Now.ToString("yyyyMMdd") + @".log";
-            LogFile += strLogFileName;
+            String strLogFileName = LOGDIRECTORY + DateTime.Now.ToString("yyyyMMdd") + @".log";
             try
             {
-                lock (LogFile)
+                using (StreamWriter streamWriter = new StreamWriter(strLogFileName, true))
                 {
-                    using (StreamWriter streamWriter = new StreamWriter(LogFile, true))
-                    {
-                        streamWriter.WriteLine(DateTime.Now.ToString() + " " + LogEntry + "...");
-                    }
+                    streamWriter.WriteLine(DateTime.Now.ToString() + " " + LogEntry + "...");
                 }
             }
             catch (Exception ex)
@@ -208,10 +235,23 @@ namespace SystemMonitor
             }
         }
 
+        private void RunConsumer()
+        {
+            foreach(var item in logMessages.GetConsumingEnumerable())
+            {
+                addToLog(item.ToString());
+            }
+        }
+
         private void Form_FormClosing(object sender, FormClosingEventArgs e)
         {
             notifyIcon1.Visible = false;
             notifyIcon1.Dispose();
+        }
+
+        private void toolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            this.Close();
         }
 
         enum Topology
@@ -223,10 +263,5 @@ namespace SystemMonitor
             Supplied,
             Unknown
         };
-
-        private void toolStripMenuItem1_Click(object sender, EventArgs e)
-        {
-            this.Close();
-        }
     }
 }
