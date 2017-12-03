@@ -71,17 +71,17 @@
             // timer1
             // 
             this.timer1.Enabled = true;
-            this.timer1.Interval = 20000;
+            this.timer1.Interval = 600000;
             this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
             // 
-            // Form
+            // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(225, 126);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
-            this.Name = "Form";
+            this.Name = "MainForm";
             this.ShowInTaskbar = false;
             this.Text = "SystemMonitor";
             this.contextMenuStrip1.ResumeLayout(false);

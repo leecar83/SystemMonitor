@@ -22,7 +22,7 @@ namespace SystemMonitor
         private const String NETWORKREGKEYNAME = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles";
         private const String LOGDIRECTORY = @"C:\StoreSys\Applications\Logs\SystemMonitor\";
         BlockingCollection<String> logMessages = new BlockingCollection<String>();
-        private int iLongtimerInterval = 40000;
+        private int iLongtimerInterval = 1800000;
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private extern static int QueryDisplayConfig([In] uint flags, ref uint numPathArrayElements, IntPtr pathArray, ref uint numModeArrayElements, IntPtr modeArray, out IntPtr currentTopologyId);
@@ -95,7 +95,7 @@ namespace SystemMonitor
                 localKey = Registry.LocalMachine.OpenSubKey(NETWORKREGKEYNAME);
                 foreach (String subKey in localKey.GetSubKeyNames())
                 {
-                    //Registry.SetValue(localKey + @"\" + subKey, "Category", 1);
+                    Registry.SetValue(localKey + @"\" + subKey, "Category", 1);
                     addToLog(subKey + " Set to Private Network");
 
                 }
@@ -127,8 +127,8 @@ namespace SystemMonitor
                     if (current == Topology.Extend)
                     {
                         addToLog("Attempting to switch to clone mode");
-                        //Process proc = Process.Start("DisplaySwitch", "/clone");
-                        //proc.WaitForExit();
+                        Process proc = Process.Start("DisplaySwitch", "/clone");
+                        proc.WaitForExit();
                         addToLog("Waiting for 10sec DisplaySwitch to work");
                         Thread.Sleep(10000);
                         current = getCurrentTopology();
@@ -221,6 +221,11 @@ namespace SystemMonitor
 
         private void addToLog(String LogEntry)
         {
+            logMessages.Add(LogEntry);
+        }
+
+        private void processLog(String LogEntry)
+        {
             String strLogFileName = LOGDIRECTORY + DateTime.Now.ToString("yyyyMMdd") + @".log";
             try
             {
@@ -239,7 +244,7 @@ namespace SystemMonitor
         {
             foreach(var item in logMessages.GetConsumingEnumerable())
             {
-                addToLog(item.ToString());
+                processLog(item.ToString());
             }
         }
 
