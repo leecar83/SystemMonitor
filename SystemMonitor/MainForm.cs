@@ -18,8 +18,7 @@ namespace SystemMonitor
 {
     public partial class MainForm : System.Windows.Forms.Form
     {
-        #region DLL Imports and Constants
-        private const String NETWORKREGKEYNAME = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles";
+        #region DLL Imports, Variables, and Constants
         private const String LOGDIRECTORY = @"C:\StoreSys\Applications\Logs\SystemMonitor\";
         BlockingCollection<String> logMessages = new BlockingCollection<String>();
         private int iLongtimerInterval = 1800000;
@@ -51,7 +50,6 @@ namespace SystemMonitor
             Task.Factory.StartNew(() => RunConsumer());
             addToLog("Starting Up");
             backgroundWorker1.RunWorkerAsync();
-            backgroundWorker2.RunWorkerAsync();
         }
 
         private void Form_Load(object sender, EventArgs e)
@@ -60,11 +58,6 @@ namespace SystemMonitor
         }
 
         private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
-        {
-            setNetworkType();
-        }
-
-        private void backgroundWorker2_DoWork(object sender, DoWorkEventArgs e)
         {
             setDisplayTopology();
         }
@@ -75,38 +68,6 @@ namespace SystemMonitor
             if (!backgroundWorker1.IsBusy)
             {
                 backgroundWorker1.RunWorkerAsync();
-            }
-            if (!backgroundWorker2.IsBusy)
-            {
-                backgroundWorker2.RunWorkerAsync();
-            }
-        }
-
-        /// <summary>
-        /// Sets network type to private for all network adapters
-        /// </summary>
-        private void setNetworkType()
-        {
-            RegistryKey localKey = null;
-            try
-            {
-                addToLog("Setting all networks to Private");
-                localKey = RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, RegistryView.Registry64);
-                localKey = Registry.LocalMachine.OpenSubKey(NETWORKREGKEYNAME);
-                foreach (String subKey in localKey.GetSubKeyNames())
-                {
-                    Registry.SetValue(localKey + @"\" + subKey, "Category", 1);
-                    addToLog(subKey + " Set to Private Network");
-
-                }
-            }
-            catch (Exception ex)
-            {
-                addToLog(ex.Message);
-            }
-            finally
-            {
-                localKey.Dispose();
             }
         }
         
