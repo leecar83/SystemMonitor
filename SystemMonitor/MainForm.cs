@@ -31,12 +31,6 @@ namespace SystemMonitor
         private const uint SIZE_OF_DISPLAYCONFIG_PATH_INFO = 72;
         private const uint SIZE_OF_DISPLAYCONFIG_MODE_INFO = 64;
 
-        private const uint SDC_TOPOLOGY_INTERNAL = 1;
-        private const uint SDC_TOPOLOGY_CLONE = 2;
-        private const uint SDC_TOPOLOGY_EXTEND = 4;
-        private const uint SDC_TOPOLOGY_EXTERNAL = 0x00000008;
-        private const uint SDC_TOPOLOGY_SUPPLIED = 0x00000010;
-
         private const uint QDC_ALL_PATHS = 1;
         private const uint QDC_ONLY_ACTIVE_PATHS = 2;
         private const uint QDC_DATABASE_CURRENT = 4;
